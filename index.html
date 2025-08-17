@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FLX标签页</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="https://feli.dpdns.org/favicon.ico">
+</head>
+<body>
+  <header class="flx-header">
+    <h1>FLX</h1>
+    <div class="search-engine-switch">
+      <button data-engine="bing" class="active">Bing</button>
+      <button data-engine="google">Google</button>
+      <button data-engine="baidu">百度</button>
+    </div>
+    <button id="dark-toggle" style="margin-left:1.5rem;padding:0.5rem 1.2rem;border-radius:20px;border:none;background:#f5f7fa;cursor:pointer;font-size:1rem;transition:background 0.2s;">🌙 暗黑模式</button>
+    <button id="wall-toggle" style="margin-left:1.5rem;padding:0.5rem 1.2rem;border-radius:20px;border:none;background:#f5f7fa;cursor:pointer;font-size:1rem;transition:background 0.2s;">🖼️ 壁纸/主题</button>
+    <div class="flx-widgets">
+      <span id="flx-weather" style="margin-right:1.5rem;color:#4f8cff;font-weight:500">天气加载中...</span>
+      <span id="flx-time" style="color:#00c6fb;font-weight:500">00:00:00</span>
+    </div>
+  </header>
+  <main>
+    <form id="search-form">
+      <input type="text" id="search-input" placeholder="搜索点什么叭..." autocomplete="off" aria-label="搜索">
+      <div id="search-suggest" style="position:absolute;z-index:99;top:100%;left:0;width:100%;background:var(--card-bg);border-radius:0 0 16px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.07);display:none;"></div>
+      <button type="submit">搜索</button>
+    </form>
+    <section class="quick-links">
+      <h2>常用网站</h2>
+      <form id="site-form" style="display:flex;gap:0.7rem;margin-bottom:1rem;">
+        <input type="text" id="site-name" placeholder="名称" style="flex:1;padding:0.7rem 1rem;border-radius:12px;border:1px solid #e0eafc;font-size:1rem;">
+        <input type="url" id="site-url" placeholder="网址 https://" style="flex:2;padding:0.7rem 1rem;border-radius:12px;border:1px solid #e0eafc;font-size:1rem;">
+        <button type="submit" style="padding:0.7rem 1.2rem;border-radius:12px;border:none;background:linear-gradient(90deg,#4f8cff,#00c6fb);color:#fff;font-size:1rem;">添加</button>
+      </form>
+      <div class="links-grid" id="site-list"></div>
+    </section>
+    <section class="flx-todo">
+      <h2>待办 / 便签</h2>
+      <form id="todo-form" style="display:flex;gap:0.7rem;margin-bottom:1rem;">
+        <input type="text" id="todo-input" placeholder="写点什么..." autocomplete="off" style="flex:1;padding:0.7rem 1rem;border-radius:12px;border:1px solid #e0eafc;font-size:1rem;">
+        <button type="submit" style="padding:0.7rem 1.2rem;border-radius:12px;border:none;background:linear-gradient(90deg,#4f8cff,#00c6fb);color:#fff;font-size:1rem;">添加</button>
+      </form>
+      <ul id="todo-list" style="list-style:none;padding:0;margin:0;"></ul>
+    </section>
+  </main>
+  <footer>
+    <span>© 2025 FELIX | FLX标签页 | Cloudflare</span>
+  </footer>
+  <script src="main.js"></script>
+  <script src="widget.js"></script>
+  <script>
+    // 暗黑模式切换
+    const darkBtn = document.getElementById('dark-toggle');
+    function setDarkMode(on) {
+      if(on){
+        document.body.classList.add('dark-mode');
+        darkBtn.textContent = '☀️ 亮色模式';
+        localStorage.setItem('flx-dark','1');
+      }else{
+        document.body.classList.remove('dark-mode');
+        darkBtn.textContent = '🌙 暗黑模式';
+        localStorage.setItem('flx-dark','0');
+      }
+    }
+    darkBtn.onclick = ()=>setDarkMode(!document.body.classList.contains('dark-mode'));
+    // 自动读取
+    if(localStorage.getItem('flx-dark')==='1'||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)){
+      setDarkMode(true);
+    }
+    // 待办功能
+    const todoForm = document.getElementById('todo-form');
+    const todoInput = document.getElementById('todo-input');
+    const todoList = document.getElementById('todo-list');
+    function renderTodo(){
+      todoList.innerHTML = '';
+      const arr = JSON.parse(localStorage.getItem('flx-todo')||'[]');
+      if(arr.length===0){
+        todoList.innerHTML = '<li style="color:#888;padding:1.2rem;text-align:center;">暂无待办事项</li>';
+        return;
+      }
+      arr.forEach((item,i)=>{
+        const li = document.createElement('li');
+        li.textContent = item;
+        li.style.cssText = 'background:var(--card-bg);margin-bottom:0.5rem;padding:0.7rem 1rem;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;justify-content:space-between;align-items:center;';
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '删除';
+        delBtn.style.cssText = 'margin-left:1rem;padding:0.3rem 0.8rem;border-radius:8px;border:none;background:#ff4f4f;color:#fff;cursor:pointer;font-size:0.95rem;';
+        delBtn.onclick = ()=>{
+          arr.splice(i,1);
+          localStorage.setItem('flx-todo',JSON.stringify(arr));
+          renderTodo();
+        };
+        li.appendChild(delBtn);
+        todoList.appendChild(li);
+      });
+    }
+    todoForm.onsubmit = function(e){
+      e.preventDefault();
+      const val = todoInput.value.trim();
+      if(!val){
+        todoInput.style.borderColor = '#ff4f4f';
+        todoInput.placeholder = '不能为空！';
+        setTimeout(()=>{
+          todoInput.style.borderColor = '';
+          todoInput.placeholder = '写点什么...';
+        },1200);
+        return;
+      }
+      const arr = JSON.parse(localStorage.getItem('flx-todo')||'[]');
+      arr.push(val);
+      localStorage.setItem('flx-todo',JSON.stringify(arr));
+      todoInput.value = '';
+      renderTodo();
+    };
+    renderTodo();
+    // 壁纸/主题切换
+    const wallBtn = document.getElementById('wall-toggle');
+    const presetWalls = [
+      'linear-gradient(120deg, #e0eafc 0%, #cfdef3 100%)',
+      'linear-gradient(120deg, #232526 0%, #414345 100%)',
+      'url(https://feli.dpdns.org/bg1.jpg)',
+      'url(https://feli.dpdns.org/bg2.jpg)',
+      'url(https://feli.dpdns.org/bg3.jpg)'
+    ];
+    let wallIdx = parseInt(localStorage.getItem('flx-wall')||'0');
+    function setWall(idx){
+      wallIdx = idx;
+      document.body.style.background = presetWalls[idx];
+      localStorage.setItem('flx-wall',idx);
+    }
+    wallBtn.onclick = function(){
+      wallIdx = (wallIdx+1)%presetWalls.length;
+      setWall(wallIdx);
+    };
+    setWall(wallIdx);
+    // 快捷搜索建议
+    const searchInput = document.getElementById('search-input');
+    const suggestBox = document.getElementById('search-suggest');
+    const hotWords = ['B站','Felix','GitHub','天气查询','HTML教程','CSS动画','PHP登录','Cloudflare',
+      'Java教程','C++教程','C语言教程','算法与数据结构','机器学习','深度学习','计算机网络','操作系统','软件工程',
+      'JavaScript','Python','Vue.js','React','Node.js','前端开发','后端开发','全栈工程师','Web开发',
+      'Linux教程','Docker入门','Kubernetes','MySQL教程','MongoDB','Redis','API设计','RESTful架构',
+      'GraphQL','TypeScript','Flutter开发','移动端开发'];
+    function getHistory(){
+      return JSON.parse(localStorage.getItem('flx-search-hist')||'[]');
+    }
+    function addHistory(word){
+      let arr = getHistory();
+      if(!arr.includes(word)){
+        arr.unshift(word);
+        if(arr.length>10)arr.pop();
+        localStorage.setItem('flx-search-hist',JSON.stringify(arr));
+      }
+    }
+    searchInput.addEventListener('input',function(){
+      const val = this.value.trim();
+      let list = [];
+      if(val){
+        // 优化：建议去重
+        const merged = hotWords.filter(w=>w.includes(val)).concat(getHistory().filter(w=>w.includes(val)));
+        list = Array.from(new Set(merged));
+      }else{
+        list = getHistory();
+      }
+      if(list.length){
+        suggestBox.innerHTML = list.map(w=>`<div style='padding:0.7rem 1rem;cursor:pointer;'>${w}</div>`).join('');
+        suggestBox.style.display = 'block';
+      }else{
+        suggestBox.style.display = 'none';
+      }
+    });
+    suggestBox.addEventListener('mousedown',function(e){
+      if(e.target&&e.target.textContent){
+        searchInput.value = e.target.textContent;
+        suggestBox.style.display = 'none';
+      }
+    });
+    document.getElementById('search-form').addEventListener('submit',function(){
+      addHistory(searchInput.value.trim());
+      suggestBox.style.display = 'none';
+    });
+    document.body.addEventListener('click',function(e){
+      if(e.target!==searchInput)suggestBox.style.display='none';
+    });
+    // 常用网站管理
+    const defaultSites = [
+      {name:'哔哩哔哩',url:'https://www.bilibili.com/'},
+      {name:'Felix的主页',url:'https://feli.dpdns.org/'},
+      {name:'GitHub',url:'https://github.com/'},
+      {name:'博客园',url:'https://www.cnblogs.com/'},
+      {name:'知乎',url:'https://www.zhihu.com/'},
+      {name:'淘宝',url:'https://www.taobao.com/'}
+    ];
+    function getSites(){
+      return JSON.parse(localStorage.getItem('flx-sites')||'null')||defaultSites;
+    }
+    function setSites(arr){
+      localStorage.setItem('flx-sites',JSON.stringify(arr));
+    }
+    function renderSites(){
+      const arr = getSites();
+      const grid = document.getElementById('site-list');
+      grid.innerHTML = '';
+      if(arr.length===0){
+        grid.innerHTML = '<div style="color:#888;padding:1.2rem;text-align:center;">暂无常用网站</div>';
+        return;
+      }
+      arr.forEach((site,i)=>{
+        const a = document.createElement('a');
+        a.href = site.url;
+        a.textContent = site.name;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.style.cssText = 'position:relative;';
+        // 编辑按钮
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✏️';
+        editBtn.title = '修改';
+        editBtn.style.cssText = 'position:absolute;top:6px;right:36px;padding:0.2rem 0.5rem;border-radius:8px;border:none;background:#ffe066;color:#222;cursor:pointer;font-size:0.9rem;';
+        editBtn.onclick = function(e){
+          e.preventDefault();
+          document.getElementById('site-name').value = site.name;
+          document.getElementById('site-url').value = site.url;
+          grid.dataset.edit = i;
+        };
+        // 右键菜单：修改字体和名称
+        a.addEventListener('contextmenu',function(e){
+          e.preventDefault();
+          let newName = prompt('修改网站名称',site.name);
+          if(newName!==null&&newName.trim()){
+            arr[i].name = newName.trim();
+          }
+          let newFont = prompt('自定义字体（如 Segoe UI, Arial）',a.style.fontFamily||'');
+          if(newFont!==null&&newFont.trim()){
+            a.style.fontFamily = newFont.trim();
+            arr[i].font = newFont.trim();
+          }
+          setSites(arr);
+          renderSites();
+        });
+        // 删除按钮
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.title = '删除';
+        delBtn.style.cssText = 'position:absolute;top:6px;right:6px;padding:0.2rem 0.5rem;border-radius:8px;border:none;background:#ff4f4f;color:#fff;cursor:pointer;font-size:0.9rem;';
+        delBtn.onclick = function(e){
+          e.preventDefault();
+          arr.splice(i,1);
+          setSites(arr);
+          renderSites();
+        };
+        a.appendChild(editBtn);
+        a.appendChild(delBtn);
+        grid.appendChild(a);
+      });
+    }
+    document.getElementById('site-form').onsubmit = function(e){
+      e.preventDefault();
+      const name = document.getElementById('site-name').value.trim();
+      const url = document.getElementById('site-url').value.trim();
+      if(!name||!url||!/^https?:\/\/.+/.test(url)){
+        document.getElementById('site-name').style.borderColor = name?'':'#ff4f4f';
+        document.getElementById('site-url').style.borderColor = url.match(/^https?:\/\/.+/)?'':'#ff4f4f';
+        setTimeout(()=>{
+          document.getElementById('site-name').style.borderColor = '';
+          document.getElementById('site-url').style.borderColor = '';
+        },1200);
+        return;
+      }
+      let arr = getSites();
+      if(document.getElementById('site-list').dataset.edit){
+        arr[parseInt(document.getElementById('site-list').dataset.edit)] = {name,url};
+        document.getElementById('site-list').dataset.edit = '';
+      }else{
+        arr.push({name,url});
+      }
+      setSites(arr);
+      renderSites();
+      document.getElementById('site-name').value = '';
+      document.getElementById('site-url').value = '';
+    };
+    renderSites();
+  </script>
+</body>
+</html>
